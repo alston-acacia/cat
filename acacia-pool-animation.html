@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acacia — Pool Jump</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Courier+Prime:wght@400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --accent: #00c8ff;
+    --pool-blue: #1ab5e8;
+    --pool-deep: #0a7ab5;
+    --tile: #e8f4f8;
+    --sky-top: #87ceeb;
+    --sky-bot: #c8eeff;
+  }
+
+  body {
+    background: linear-gradient(160deg, #0a1628 0%, #0d2240 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Courier Prime', monospace;
+    overflow: hidden;
+    cursor: none;
+  }
+
+  /* ── CURSOR ── */
+  .cursor {
+    position: fixed; pointer-events: none; z-index: 999;
+    width: 12px; height: 12px;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* ── SCENE ── */
+  .scene-wrap {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 32px;
+  }
+
+  .scene {
+    width: 580px; height: 240px;
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.12);
+    box-shadow: 0 0 60px rgba(0,200,255,0.18), 0 0 120px rgba(0,0,0,0.6);
+  }
+
+  /* ── SKY ── */
+  .sky {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, #4ab8f5 0%, #a8e4ff 55%, #d8f4ff 100%);
+  }
+
+  /* ── SUN ── */
+  .sun {
+    position: absolute; top: 18px; right: 55px;
+    width: 42px; height: 42px;
+    background: radial-gradient(circle at 40% 40%, #fff9c0, #ffdd00);
+    border-radius: 50%;
+    box-shadow: 0 0 24px 10px rgba(255,230,50,0.45);
+  }
+
+  /* ── CLOUDS ── */
+  .cloud {
+    position: absolute;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50px;
+  }
+  .cloud::before, .cloud::after {
+    content: '';
+    position: absolute;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50%;
+  }
+  .cloud1 { top: 28px; left: 40px; width: 70px; height: 20px; }
+  .cloud1::before { width: 32px; height: 32px; top: -16px; left: 10px; }
+  .cloud1::after  { width: 24px; height: 24px; top: -12px; left: 30px; }
+  .cloud2 { top: 16px; left: 180px; width: 50px; height: 16px; opacity: 0.7; }
+  .cloud2::before { width: 24px; height: 24px; top: -12px; left: 8px; }
+  .cloud2::after  { width: 18px; height: 18px; top: -9px; left: 24px; }
+
+  /* ── GROUND / POOL DECK ── */
+  .deck {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 70px;
+    background: linear-gradient(180deg, #f0e8d0 0%, #d9c9a0 100%);
+    border-top: 3px solid #e8d8b0;
+  }
+  /* tile pattern on deck */
+  .deck::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 40px),
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 20px);
+  }
+
+  /* ── POOL ── */
+  .pool {
+    position: absolute;
+    bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 220px; height: 70px;
+    background: linear-gradient(180deg, #29c4f0 0%, #0e8ec8 100%);
+    border-left: 6px solid #5dd8f8;
+    border-right: 6px solid #5dd8f8;
+    border-top: 6px solid #7ae8ff;
+    overflow: hidden;
+    z-index: 2;
+  }
+
+  /* pool shimmer lines */
+  .pool::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      -30deg,
+      rgba(255,255,255,0.0) 0px,
+      rgba(255,255,255,0.0) 14px,
+      rgba(255,255,255,0.12) 15px,
+      rgba(255,255,255,0.12) 16px
+    );
+    animation: shimmer 2s linear infinite;
+  }
+  @keyframes shimmer { from { background-position: 0 0; } to { background-position: 40px 40px; } }
+
+  /* pool wave surface */
+  .wave {
+    position: absolute; top: 0; left: -100%; width: 300%;
+    height: 10px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 50%;
+    animation: wave 2.2s ease-in-out infinite;
+  }
+  .wave2 {
+    animation: wave 2.8s ease-in-out infinite reverse;
+    opacity: 0.5;
+    top: 4px;
+  }
+  @keyframes wave {
+    0%, 100% { transform: translateX(0) scaleY(1); }
+    50%       { transform: translateX(6%) scaleY(1.4); }
+  }
+
+  /* ── DIVING BOARD ── */
+  .board-wrap {
+    position: absolute;
+    bottom: 68px; left: calc(50% - 160px);
+    z-index: 4;
+  }
+  .board-post {
+    width: 8px; height: 36px;
+    background: linear-gradient(180deg, #bbb, #888);
+    margin-left: 10px;
+    border-radius: 2px;
+  }
+  .board {
+    width: 90px; height: 8px;
+    background: linear-gradient(180deg, #e0e0e0, #aaa);
+    border-radius: 2px 6px 6px 2px;
+    margin-top: -4px;
+    position: relative;
+  }
+  .board::after {
+    content: '';
+    position: absolute; right: -4px; top: -3px;
+    width: 8px; height: 14px;
+    background: #bbb;
+    border-radius: 0 4px 4px 0;
+  }
+
+  /* ── POOL LADDER ── */
+  .ladder {
+    position: absolute;
+    bottom: 0; right: calc(50% - 90px);
+    width: 22px; height: 50px;
+    z-index: 3;
+  }
+  .ladder::before, .ladder::after {
+    content: '';
+    position: absolute; top: 0; bottom: 0;
+    width: 4px; background: #5dd8f8; border-radius: 2px;
+  }
+  .ladder::before { left: 2px; }
+  .ladder::after  { right: 2px; }
+
+  /* ── SPLASH ── */
+  .splash {
+    position: absolute;
+    bottom: 62px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .splash.active {
+    animation: splashAnim 0.8s ease-out forwards;
+  }
+  @keyframes splashAnim {
+    0%   { opacity: 0; transform: translateX(-50%) scaleY(0.2); }
+    20%  { opacity: 1; transform: translateX(-50%) scaleY(1); }
+    100% { opacity: 0; transform: translateX(-50%) scaleY(0.6) translateY(10px); }
+  }
+
+  /* ripple rings in pool */
+  .ripple {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.6);
+    top: 2px; left: 50%;
+    transform: translate(-50%, 0) scale(0);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .ripple.active {
+    animation: rippleAnim 1.2s ease-out forwards;
+  }
+  .ripple.r2.active { animation-delay: 0.2s; }
+  .ripple.r3.active { animation-delay: 0.4s; }
+  @keyframes rippleAnim {
+    from { transform: translate(-50%, 0) scale(0); opacity: 0.8; width: 20px; height: 12px; }
+    to   { transform: translate(-50%, 0) scale(1); opacity: 0; width: 180px; height: 40px; }
+  }
+
+  /* ── BLACK CAT ── */
+  .cat {
+    position: absolute;
+    bottom: 70px;
+    left: 30px;
+    width: 58px; height: 44px;
+    z-index: 5;
+  }
+  .cat svg { width: 100%; height: 100%; overflow: visible; }
+
+  @keyframes catJump {
+    0%   { transform: translateX(0)    translateY(0)     rotate(0deg); }
+    10%  { transform: translateX(20px)  translateY(-15px)  rotate(-5deg); }
+    35%  { transform: translateX(140px) translateY(-130px) rotate(-20deg); }
+    60%  { transform: translateX(240px) translateY(-100px) rotate(10deg); }
+    85%  { transform: translateX(290px) translateY(-10px)  rotate(80deg); }
+    100% { transform: translateX(295px) translateY(20px)   rotate(90deg); }
+  }
+  @keyframes tailWag {
+    0%, 100% { transform: rotate(0deg); }
+    50%       { transform: rotate(30deg); }
+  }
+
+  .cat.jumping {
+    animation: catJump 1.5s cubic-bezier(0.4,0,0.6,1) forwards;
+  }
+  .cat.jumping .cat-tail {
+    animation: tailWag 0.25s ease-in-out infinite;
+  }
+  .cat.hiding { opacity: 0; }
+
+  /* ── COMPANY NAME ── */
+  .company-name {
+    position: absolute;
+    top: 40%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.4);
+    font-family: 'Playfair Display', serif;
+    font-size: 36px; font-weight: 900;
+    color: #fff;
+    text-align: center;
+    line-height: 1.1;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    opacity: 0;
+    z-index: 10;
+    pointer-events: none;
+    text-shadow:
+      0 0 30px rgba(0,200,255,0.9),
+      0 0 60px rgba(0,150,255,0.5),
+      0 2px 0 rgba(0,0,0,0.4);
+    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .company-name.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .company-name span {
+    display: block;
+    font-size: 14px; font-weight: 400;
+    letter-spacing: 0.4em;
+    color: var(--accent);
+    margin-top: 6px;
+    font-family: 'Courier Prime', monospace;
+    text-shadow: none;
+  }
+
+  /* ── PARTICLES ── */
+  .particle {
+    position: absolute; pointer-events: none; z-index: 8;
+    border-radius: 50%;
+    animation: burst 0.9s ease-out forwards;
+  }
+  @keyframes burst {
+    from { transform: translate(0,0) scale(1); opacity: 1; }
+    to   { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+  }
+
+  /* ── WATER DROPLETS (after splash) ── */
+  .drop {
+    position: absolute;
+    width: 4px; height: 8px;
+    background: rgba(100,220,255,0.8);
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    pointer-events: none; z-index: 7;
+    animation: dropFall var(--dur, 0.7s) ease-in forwards;
+  }
+  @keyframes dropFall {
+    from { transform: translate(var(--sx),var(--sy)) scale(1); opacity: 1; }
+    to   { transform: translate(var(--ex),var(--ey)) scale(0.5); opacity: 0; }
+  }
+
+  /* ── INPUT AREA ── */
+  .input-area {
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  .hint {
+    color: rgba(255,255,255,0.35);
+    font-size: 13px; letter-spacing: 0.15em; text-transform: uppercase;
+  }
+  .letter-display { display: flex; gap: 10px; }
+  .letter-box {
+    width: 42px; height: 52px;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700;
+    color: #fff;
+    background: rgba(255,255,255,0.04);
+    transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .letter-box.filled {
+    border-color: var(--accent);
+    background: rgba(0,200,255,0.15);
+    box-shadow: 0 0 12px rgba(0,200,255,0.35);
+    color: #a8f0ff;
+  }
+  .letter-box.correct {
+    border-color: #6adf5e;
+    background: rgba(106,223,94,0.15);
+    box-shadow: 0 0 12px rgba(106,223,94,0.3);
+    color: #c2ffbd;
+  }
+
+  .reset-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.4);
+    font-family: 'Courier Prime', monospace;
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 6px 14px; border-radius: 4px; cursor: pointer;
+    transition: all 0.2s; margin-top: 4px;
+  }
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+
+<div class="scene-wrap">
+  <div class="scene" id="scene">
+
+    <!-- SKY -->
+    <div class="sky"></div>
+    <div class="sun"></div>
+    <div class="cloud cloud1"></div>
+    <div class="cloud cloud2"></div>
+
+    <!-- DECK -->
+    <div class="deck"></div>
+
+    <!-- POOL -->
+    <div class="pool" id="pool">
+      <div class="wave"></div>
+      <div class="wave wave2"></div>
+      <!-- ripple rings -->
+      <div class="ripple r1" id="ripple1" style="width:20px;height:12px;"></div>
+      <div class="ripple r2" id="ripple2" style="width:20px;height:12px;"></div>
+      <div class="ripple r3" id="ripple3" style="width:20px;height:12px;"></div>
+    </div>
+
+    <!-- DIVING BOARD -->
+    <div class="board-wrap">
+      <div class="board-post"></div>
+      <div class="board"></div>
+    </div>
+
+    <!-- POOL LADDER -->
+    <div class="ladder"></div>
+
+    <!-- SPLASH SVG -->
+    <div class="splash" id="splash">
+      <svg width="100" height="70" viewBox="0 0 100 70">
+        <path d="M50 60 Q30 30 10 20 Q30 45 50 35 Q70 45 90 20 Q70 30 50 60Z" fill="rgba(100,220,255,0.7)"/>
+        <path d="M50 55 Q20 20 5 8 Q25 38 50 30 Q75 38 95 8 Q80 20 50 55Z" fill="rgba(180,240,255,0.5)"/>
+        <!-- droplet spikes -->
+        <ellipse cx="50" cy="8" rx="5" ry="12" fill="rgba(100,220,255,0.8)" transform="rotate(0,50,35)"/>
+        <ellipse cx="20" cy="14" rx="4" ry="10" fill="rgba(100,220,255,0.7)" transform="rotate(-25,20,35)"/>
+        <ellipse cx="80" cy="14" rx="4" ry="10" fill="rgba(100,220,255,0.7)" transform="rotate(25,80,35)"/>
+        <ellipse cx="8"  cy="28" rx="3" ry="8"  fill="rgba(100,220,255,0.5)" transform="rotate(-40,8,40)"/>
+        <ellipse cx="92" cy="28" rx="3" ry="8"  fill="rgba(100,220,255,0.5)" transform="rotate(40,92,40)"/>
+      </svg>
+    </div>
+
+    <!-- BLACK CAT -->
+    <div class="cat" id="cat">
+      <svg viewBox="0 0 58 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- tail -->
+        <g class="cat-tail" style="transform-origin: 5px 24px;">
+          <path d="M5 24 Q-10 16 -8 4" stroke="#111" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+        </g>
+        <!-- body -->
+        <ellipse cx="29" cy="28" rx="19" ry="13" fill="#111"/>
+        <!-- belly patch -->
+        <ellipse cx="29" cy="30" rx="10" ry="8" fill="#2a2a2a"/>
+        <!-- head -->
+        <ellipse cx="46" cy="19" rx="12" ry="11" fill="#111"/>
+        <!-- ears -->
+        <polygon points="37,11 39,2 44,11" fill="#111"/>
+        <polygon points="50,10 52,1 57,10" fill="#111"/>
+        <polygon points="38,10 40,5 43,10" fill="#3a1a2a"/>
+        <polygon points="51,9 53,4 56,9" fill="#3a1a2a"/>
+        <!-- glowing green eyes -->
+        <ellipse cx="43" cy="18" rx="3" ry="3.5" fill="#00ee66"/>
+        <ellipse cx="50" cy="18" rx="3" ry="3.5" fill="#00ee66"/>
+        <ellipse cx="43" cy="18" rx="1.5" ry="2.5" fill="#003311"/>
+        <ellipse cx="50" cy="18" rx="1.5" ry="2.5" fill="#003311"/>
+        <circle cx="43.8" cy="17" r="0.7" fill="#aaffcc"/>
+        <circle cx="50.8" cy="17" r="0.7" fill="#aaffcc"/>
+        <!-- nose -->
+        <ellipse cx="47" cy="22" rx="1.5" ry="1" fill="#cc4466"/>
+        <!-- whiskers -->
+        <line x1="47" y1="21" x2="60" y2="19" stroke="#555" stroke-width="0.8"/>
+        <line x1="47" y1="23" x2="60" y2="25" stroke="#555" stroke-width="0.8"/>
+        <line x1="35" y1="21" x2="22" y2="19" stroke="#555" stroke-width="0.8"/>
+        <line x1="35" y1="23" x2="22" y2="25" stroke="#555" stroke-width="0.8"/>
+        <!-- legs -->
+        <rect x="17" y="36" width="6" height="10" rx="3" fill="#111"/>
+        <rect x="28" y="36" width="6" height="10" rx="3" fill="#111"/>
+        <rect x="39" y="35" width="6" height="9"  rx="3" fill="#111"/>
+        <rect x="10" y="35" width="6" height="9"  rx="3" fill="#111"/>
+        <!-- paws -->
+        <ellipse cx="20" cy="46" rx="4" ry="2.5" fill="#1a1a1a"/>
+        <ellipse cx="31" cy="46" rx="4" ry="2.5" fill="#1a1a1a"/>
+      </svg>
+    </div>
+
+    <!-- Company name overlay -->
+    <div class="company-name" id="companyName">
+      TEST COMPANY
+      <span>making a splash</span>
+    </div>
+
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-area">
+    <div class="hint">Type the magic word</div>
+    <div class="letter-display" id="letterDisplay"></div>
+    <button class="reset-btn" id="resetBtn">↺ Reset</button>
+  </div>
+</div>
+
+<script>
+  const TARGET = 'acacia';
+  let typed = '';
+  let animating = false;
+  let done = false;
+
+  // Cursor
+  const cursor = document.getElementById('cursor');
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top  = e.clientY + 'px';
+  });
+
+  // Letter boxes
+  const display = document.getElementById('letterDisplay');
+  TARGET.split('').forEach((ch, i) => {
+    const box = document.createElement('div');
+    box.className = 'letter-box';
+    box.id = 'box' + i;
+    display.appendChild(box);
+  });
+
+  function updateBoxes() {
+    TARGET.split('').forEach((ch, i) => {
+      const box = document.getElementById('box' + i);
+      if (i < typed.length) {
+        box.textContent = typed[i].toUpperCase();
+        box.classList.remove('filled');
+        box.classList.add('correct');
+      } else {
+        box.textContent = '';
+        box.classList.remove('correct', 'filled');
+      }
+    });
+    if (typed.length < TARGET.length) {
+      const cur = document.getElementById('box' + typed.length);
+      cur && cur.classList.add('filled');
+    }
+  }
+
+  // Particles
+  function burst(x, y, colors) {
+    colors = colors || ['#00c8ff','#fff','#6adf5e','#ffd700','#80e8ff'];
+    const scene = document.getElementById('scene');
+    for (let i = 0; i < 18; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const size = Math.random()*6+3;
+      const angle = (Math.random()*360) * Math.PI/180;
+      const dist  = Math.random()*70+25;
+      p.style.cssText = `
+        width:${size}px; height:${size}px;
+        left:${x}px; top:${y}px;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        --dx:${Math.cos(angle)*dist}px;
+        --dy:${Math.sin(angle)*dist}px;
+        animation-duration:${(Math.random()*0.4+0.5).toFixed(2)}s;
+      `;
+      scene.appendChild(p);
+      setTimeout(() => p.remove(), 1000);
+    }
+  }
+
+  // Water droplets
+  function waterDroplets(cx, cy) {
+    const scene = document.getElementById('scene');
+    for (let i = 0; i < 14; i++) {
+      const d = document.createElement('div');
+      d.className = 'drop';
+      const angle = (Math.random() * 180 - 90) * Math.PI / 180; // upward arc
+      const speed = Math.random() * 60 + 30;
+      const sx = cx + (Math.random() - 0.5) * 20;
+      const sy = cy;
+      const ex = sx + Math.cos(angle) * speed * 0.8;
+      const ey = sy - Math.abs(Math.sin(angle) * speed) + (Math.random() * 30 + 20);
+      const dur = (Math.random() * 0.4 + 0.5).toFixed(2);
+      d.style.cssText = `
+        left:${sx}px; top:${sy}px;
+        --sx:0px; --sy:0px;
+        --ex:${ex - sx}px; --ey:${ey - sy}px;
+        --dur:${dur}s;
+        animation-delay:${(Math.random()*0.15).toFixed(2)}s;
+      `;
+      scene.appendChild(d);
+      setTimeout(() => d.remove(), 1200);
+    }
+  }
+
+  // Jump
+  function triggerJump() {
+    if (animating || done) return;
+    animating = true;
+
+    const cat = document.getElementById('cat');
+    cat.classList.add('jumping');
+
+    // splash + ripples + cat hide at landing
+    setTimeout(() => {
+      // hide cat (it's "in" the pool)
+      cat.classList.add('hiding');
+
+      // show splash
+      const splash = document.getElementById('splash');
+      splash.classList.add('active');
+
+      // ripples inside pool
+      ['ripple1','ripple2','ripple3'].forEach(id => {
+        document.getElementById(id).classList.add('active');
+      });
+
+      // water drops
+      waterDroplets(340, 168);
+      burst(340, 160, ['#00c8ff','#80e8ff','#fff','#4dd0f0']);
+
+      setTimeout(() => {
+        document.getElementById('companyName').classList.add('visible');
+        burst(290, 100, ['#00c8ff','#fff','#6adf5e','#ffd700']);
+        done = true;
+        animating = false;
+      }, 600);
+
+    }, 1350);
+  }
+
+  // Keydown
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' || e.key === 'Backspace') { reset(); return; }
+    if (done || animating) return;
+    if (e.key.length !== 1) return;
+
+    const ch = e.key.toLowerCase();
+    const expected = TARGET[typed.length];
+
+    if (ch === expected) {
+      typed += ch;
+      updateBoxes();
+      const box = document.getElementById('box' + (typed.length - 1));
+      if (box) {
+        const r = box.getBoundingClientRect();
+        const scene = document.getElementById('scene');
+        const sr = scene.getBoundingClientRect();
+        burst(r.left - sr.left + 20, r.top - sr.top + 20);
+      }
+      if (typed === TARGET) setTimeout(triggerJump, 200);
+    } else {
+      const scene = document.getElementById('scene');
+      scene.style.boxShadow = '0 0 40px rgba(255,60,60,0.5)';
+      setTimeout(() => { scene.style.boxShadow = ''; }, 300);
+    }
+  });
+
+  // Reset
+  function reset() {
+    typed = ''; done = false; animating = false;
+    const cat = document.getElementById('cat');
+    cat.classList.remove('jumping', 'hiding');
+    cat.style.animation = 'none';
+    void cat.offsetHeight;
+    cat.style.animation = '';
+
+    const splash = document.getElementById('splash');
+    splash.classList.remove('active');
+
+    ['ripple1','ripple2','ripple3'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove('active');
+      void el.offsetHeight;
+    });
+
+    document.getElementById('companyName').classList.remove('visible');
+    updateBoxes();
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', reset);
+  updateBoxes();
+</script>
+</body>
+</html>
